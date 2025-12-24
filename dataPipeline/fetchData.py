@@ -35,3 +35,6 @@ class DataPipeLine:
 
     def display_data_in_terminal(self):
         pass
+
+    def get_training_data(self):
+        pass 
