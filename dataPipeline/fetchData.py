@@ -48,3 +48,12 @@ class DataPipeLine:
     def save_data_to_csv(df: pd.DataFrame, file_name:str):
         file_path = os.path.join(os.path.dirname(__file__), '..', 'data', file_name)
         df.to_csv(file_path, index=False)
+
+    @staticmethod
+    def save_data_to_existing_csv(df: pd.DataFrame, file_name:str):
+        file_path = os.path.join(os.path.dirname(__file__), '..', 'data', file_name)
+        old_df = pd.read_csv(file_name)
+        df = pd.concat([old_df, df], axis= 0, ignore_index=True)
+        df.sort_values(by="date", inplace=True)
+        df.to_csv(file_path, index=False)
+    
