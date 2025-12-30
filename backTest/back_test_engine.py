@@ -3,7 +3,7 @@ import pandas as pd
 from typing import List, Dict, Optional
 import sys
 
-sys.append("..")
+sys.path.append("..")
 
 from detection.detection import HMMDetectionEngine
 

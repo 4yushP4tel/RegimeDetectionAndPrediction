@@ -4,14 +4,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
-from typing import Dict
+from typing import Dict, Any
 from datetime import datetime
 import warnings
 import logging
 import sys
 import torch.nn as nn
 import torch.optim as optim
-from scipy.stats import norm, norm_gen
+from scipy.stats import norm
 
 sys.path.append("..") # check parent for modules
 
@@ -21,8 +21,22 @@ class HMMDetectionEngine:
     def __init__(self):
         self.history = {}
         self.regime_data: Dict[str, tuple] = {}
-        self.regime_distributions: Dict[str, norm_gen] = {}
+        self.regime_distributions: Dict[str, Any] = {}
         self.transition_matrix: np.ndarray = None
+    
+    def pca(self):
+        """
+        This could be used to get the latent drift and vol
+        """
+        pass
+
+    def rolling_sector_correlation(self, sector: str):
+        """
+        Based on the sector, compute the rolling correlation
+        between stocks in that sector.
+        This endogenous features adds detail to HMM model.
+        """
+        pass
 
     def calibrate(self):
         pass
