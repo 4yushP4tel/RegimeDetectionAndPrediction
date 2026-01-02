@@ -1,24 +1,15 @@
 # RegimeDetectionAndPrediction
-Detect, Predict Market Regimes for Tech and Energy sectors
+
+Detect and Predict Market Regimes for the Tech sector using the XLK index
 
 ## Regime Detection
-This portion of the project aims to cluster market conditions into regimes
-This process is done using PCA on log returns of assets in the sector, correlations,
-log bid-ask spread and volumes,
 
-This will be used to fit a multivariate Hidden Markov Model which will allow us 
-to find transition matrices. Knowing the current market conditions, we will be able
-to infer the current qualitative market regime.
+This part of the project identifies different market regimes in the tech sector.
+The process involves:
+- 	Computing log returns of sector assets, along with correlations, bid-ask spreads, and trading volumes.
+-   Applying PCA to reduce dimensionality and capture the main factors driving market behavior.
+-   Using these factors as input to a multivariate Hidden Markov Model (HMM), which estimates regime-dependent parameters and transition probabilities.
 
-## Back Testing and Stress Testing
-The results of this regime modelling will be back tested using data between 2020-2025
-with rolling windows (on weeks) to extensively find if the results on a weekly basis
-made sense with the probablistic projected regimes.
-
-Stress testing will be done during periods such as 2007-2008, 2019-2020, end of 2025
-which would help model periods of low liquidity and market fear, extremely bearish markets
-and extremely bullish markets in moments of extreme volatility. 
-
-
-
-
+By fitting the HMM, we can:
+-   Infer the current market regime given observed data.
+-   Analyze transition dynamics between regimes, which can help anticipate future market conditions.

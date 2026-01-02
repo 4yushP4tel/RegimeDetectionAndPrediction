@@ -9,9 +9,9 @@ from datetime import datetime
 import warnings
 import logging
 import sys
-import torch.nn as nn
-import torch.optim as optim
+from hmmlearn.hmm import GaussianHMM
 from scipy.stats import norm
+import json
 
 sys.path.append("..") # check parent for modules
 
@@ -53,6 +53,16 @@ class HMMDetectionEngine:
     def get_regime(self):
         """
             uses gaussian likelihoods to determine most probable
+        """
+        pass
+
+    def train_hmm(self):
+        pass
+
+    def save_model_to_json(self, file_name: str):
+        """
+        This is mainly used to be able to export this somewher else
+        and potentially use it in some other language in the future.
         """
         pass
 
