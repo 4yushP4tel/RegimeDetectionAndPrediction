@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional, Tuple
 import pandas as pd
 import numpy as np
 import websocket
 import threading
+from multiprocessing import Pool, cpu_count
 import asyncio
 import requests
 from alpaca.data.historical import StockHistoricalDataClient, OptionHistoricalDataClient
@@ -25,7 +26,7 @@ class DataPipeLine:
 
     # these holdings could be used to find the correlation structure
     # which could be used as an endogenous feature in HMM
-    TOP_HOLDINGS_XLK = ["NVDA", "AAPL", "MSFT", "AVGO", "PLTR", "AMD", "ORCL",
+    TOP_HOLDINGS_XLK = ["NVDA", "AAPL", "MSFT", "AVGO", "AMD", "ORCL",
                         "MU", "CSCO", "IBM"]
     
     COL_ORDER = ["date","close","open","high","low","volume"]
@@ -42,7 +43,7 @@ class DataPipeLine:
         except Exception as e:
             print(f"Error connecting to Alpace: {e}")
 
-    def fetch_historical_data(self, symbol: str, start_date: Optional[datetime]=None, end_date: Optional[datetime]=None) -> pd.DataFrame:
+    def _fetch_historical_data(self, symbol: str, start_date: Optional[datetime]=None, end_date: Optional[datetime]=None) -> pd.DataFrame:
         try:
             response = self.client.get_stock_bars(StockBarsRequest(symbol_or_symbols=symbol, 
                                               timeframe=TimeFrame(1, TimeFrameUnit.Day),
@@ -58,7 +59,7 @@ class DataPipeLine:
             print(f"Error fetching historical data: {e}")
 
     def fetch_full_historical_data(self, symbol: str) -> pd.DataFrame:
-        return self.fetch_historical_data(symbol, datetime(1900,1,1))
+        return self._fetch_historical_data(symbol, datetime(1900,1,1))
 
     def fetch_live_data(self):
         try:
@@ -67,39 +68,68 @@ class DataPipeLine:
             print(f"Error fetching live data: {e}")
         
     def fetch_and_transform_holdings_data(self) -> pd.DataFrame:
+        """
+        Note for PLTR, there is only data from 2020 onwards, so it will not be
+        included
+        """
         df_mapping = {}
         for holding in self.TOP_HOLDINGS_XLK:
             temp_df = self.fetch_full_historical_data(holding)
             temp_df = temp_df.set_index("date")
-            DataPipeLine._get_log_returns(temp_df)
-            print(f"Here is the data for : {holding}\n {temp_df}")
+            DataPipeLine.get_log_returns(temp_df)
+            temp_df = temp_df["log_returns"]
+            print(f"Here is the transformed data for : {holding}\n {temp_df}")
             print()
             df_mapping[holding] = temp_df
         
-        combined_log_returns_df = pd.concat(df_mapping, axis=1, ignore_index=True)
-        return combined_log_returns_df
+        holdings_log_return_df = pd.concat(df_mapping, axis=1)
+        return holdings_log_return_df
+    
+    def compute_rolling_correlation_matrices(self, holdings_log_returns_df: pd.DataFrame, window_size:int=30)-> List[Tuple[pd.Timestamp, np.ndarray]]:
+        # for now using a window size of 30 since this showed the best "clustering"
+        # in the log_returns of the XLK index as seen in the jupyter notebook
+        df_values = holdings_log_returns_df.to_numpy()
+        dates = holdings_log_returns_df.index
+        args_list = [(df_values, dates, i, window_size) for i in range(len(holdings_log_returns_df) - window_size + 1)]
 
-    def compute_correlation_matrix_of_holdings(self, log_returns_df: pd.DataFrame):
-        pass
+        with Pool() as pool:
+            corr_matrices_with_dates = pool.map(DataPipeLine.compute_single_corr_matrix, args_list)
+
+        return corr_matrices_with_dates
 
     @staticmethod
-    def _get_log_returns(df: pd.DataFrame):
+    def compute_single_corr_matrix(args: Tuple[pd.DataFrame, pd.Index, int, int])->Tuple[pd.Timestamp, np.ndarray]:
+        df_values, dates, start, window_size = args
+        window = df_values[start: start+window_size]
+        corr_matrix = np.corrcoef(window, rowvar=False)
+        window_end_date = dates[start+window_size-1]
+        return window_end_date, corr_matrix
+    
+    def get_full_corr_matrices_of_holdings(self)->List[np.ndarray]:
+        df = self.fetch_and_transform_holdings_data()
+        return self.compute_rolling_correlation_matrices(df)
+
+    @staticmethod
+    def get_log_returns(df: pd.DataFrame)->None:
         #using the close prices for this
         df["log_returns"] = np.log(df["close"]/df["close"].shift(1))
         df.dropna(inplace=True)
 
     @staticmethod
-    def _get_intraday_price_range(df: pd.DataFrame):
+    def get_intraday_price_range(df: pd.DataFrame)->None:
         df["price_range"] = abs(df["high"] - df["low"])
 
     @staticmethod
-    def _get_rolling_stats(df: pd.DataFrame):
+    def get_rolling_stats(df: pd.DataFrame):
+        """
+        This would be only for the actual XLK data
+        """
         pass
 
     @staticmethod
-    def get_training_data(df):
-        DataPipeLine._get_intraday_price_range(df)
-        DataPipeLine._get_log_returns(df)
+    def get_training_data(df: pd.DataFrame):
+        DataPipeLine.get_intraday_price_range(df)
+        DataPipeLine.get_log_returns(df)
 
     def get_implied_vol(self):
         """
@@ -136,4 +166,5 @@ class DataPipeLine:
 
 if __name__ == "__main__":
     dp = DataPipeLine()
-    dp.fetch_and_transform_holdings_data()
+    df = dp.fetch_and_transform_holdings_data()
+    print(df)
