@@ -60,12 +60,17 @@ class DataPipeLine:
 
     def fetch_full_historical_data(self, symbol: str) -> pd.DataFrame:
         return self._fetch_historical_data(symbol, datetime(1900,1,1))
+    
+    @staticmethod
+    def fetch_historical_data_from_csv(file_name:str = "tech_sector_xlk.csv") -> pd.DataFrame:
+        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                "..",
+                                                "data",
+                                                file_name
+                                                ))
+        df = pd.read_csv(file_path)
+        return df
 
-    def fetch_live_data(self):
-        try:
-            pass
-        except Exception as e:
-            print(f"Error fetching live data: {e}")
         
     def fetch_and_transform_holdings_data(self) -> pd.DataFrame:
         """
@@ -120,11 +125,17 @@ class DataPipeLine:
         df["price_range"] = abs(df["high"] - df["low"])
 
     @staticmethod
-    def get_rolling_stats(df: pd.DataFrame):
+    def get_rolling_stats(df: pd.DataFrame, window_size:int=30) -> None:
         """
         This would be only for the actual XLK data
+
+        Using 30-day since used the same for rolling corrs
         """
-        pass
+        if "log_returns" not in df.columns:
+            DataPipeLine.get_log_returns(df)
+        df[f"rolling_{window_size}_mean"] = df["log_returns"].rolling(window_size).mean()
+        df[f"rolling_{window_size}_vol"] = df["log_returns"].rolling(window_size).std()
+        df.dropna(inplace=True)
 
     @staticmethod
     def get_training_data(df: pd.DataFrame):
@@ -150,21 +161,30 @@ class DataPipeLine:
         file_abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', file_name))
         print(f"Saving data to existing csv at {file_abs_path}")
         old_df = pd.read_csv(file_abs_path)
+        if old_df.empty:
+            print("No Data in File Currently")
+            df.to_csv(file_abs_path, index=False)
+            return
         df = pd.concat([old_df, df], axis= 0, ignore_index=True)
         df.drop_duplicates(subset=["date"], inplace=True)
         df.sort_values(by="date", inplace=True)
         df.to_csv(file_abs_path, index=False)
 
     @staticmethod
-    def change_csv_date_format(file_name:str):
-        # used for the data which I got online
+    def change_data_format(file_name:str):
+        # used for the data which I got online. This could be set as obsolete
+        # but im just keeping this here in case I ever need it again
         file = os.path.join(os.path.dirname(__file__), '..', 'data', file_name)
         df = pd.read_csv(file)
-        df["date"] = df["date"].str.split("T").str[0]
+        df["date"] = pd.to_datetime(df["date"], format="%m/%d/%Y").dt.strftime("%Y-%m-%d")
         df.reset_index(drop=True, inplace=True)
+        df.sort_values("date", inplace=True)
+        df = df[DataPipeLine.COL_ORDER]
         df.to_csv(file, index=False)
 
 if __name__ == "__main__":
     dp = DataPipeLine()
-    df = dp.fetch_and_transform_holdings_data()
-    print(df)
+    file = os.path.join(os.path.dirname(__file__), '..', 'data', "tech_sector_xlk.csv")
+    df = pd.read_csv(file)
+    df.sort_values("date", inplace=True)
+    df.to_csv(file, index=False)
